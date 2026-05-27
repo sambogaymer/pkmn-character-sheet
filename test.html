@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Character Profile</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+<main class="screen">
+  <div class="app">
+
+    <div class="app-header">
+      <div>
+        <h1>Character Profile</h1>
+        <p class="muted">Loaded from your saved character</p>
+      </div>
+
+      <div>
+        <a href="index.html" class="secondary-button">← Back</a>
+        <button class="primary-button" onclick="window.print()">Print</button>
+      </div>
+    </div>
+
+    <section class="panel">
+      <div id="profile"></div>
+      <div id="inventory"></div>
+    </section>
+
+  </div>
+</main>
+
+<script>
+const statNames = ["Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"];
+
+const savingThrows = [
+  ["Strength", "Strength"],
+  ["Dexterity", "Dexterity"],
+  ["Constitution", "Constitution"],
+  ["Intelligence", "Intelligence"],
+  ["Wisdom", "Wisdom"],
+  ["Charisma", "Charisma"]
+];
+
+const skills = [
+  ["Acrobatics", "Dexterity"],
+  ["Animal Handling", "Wisdom"],
+  ["Arcana", "Intelligence"],
+  ["Athletics", "Strength"],
+  ["Deception", "Charisma"],
+  ["History", "Intelligence"],
+  ["Insight", "Wisdom"],
+  ["Intimidation", "Charisma"],
+  ["Investigation", "Intelligence"],
+  ["Medicine", "Wisdom"],
+  ["Nature", "Intelligence"],
+  ["Perception", "Wisdom"],
+  ["Performance", "Charisma"],
+  ["Persuasion", "Charisma"],
+  ["Religion", "Intelligence"],
+  ["Sleight of Hand", "Dexterity"],
+  ["Stealth", "Dexterity"],
+  ["Survival", "Wisdom"]
+];
+
+function abilityMod(score) {
+  return Math.floor((Number(score || 10) - 10) / 2);
+}
+
+function formatModFromScore(score) {
+  const mod = abilityMod(score);
+  return mod >= 0 ? "+" + mod : String(mod);
+}
+
+function formatFlatMod(mod) {
+  return mod >= 0 ? "+" + mod : String(mod);
+}
+
+function proficiencyBonus(level = 1) {
+  const lvl = Number(level || 1);
+  if (lvl >= 17) return 6;
+  if (lvl >= 13) return 5;
+  if (lvl >= 9) return 4;
+  if (lvl >= 5) return 3;
+  return 2;
+}
+
+function passiveScore(score, proficient = false, level = 1) {
+  return 10 + abilityMod(score) + (proficient ? proficiencyBonus(level) : 0);
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function loadCharacter() {
+  const saved = localStorage.getItem("tabletopCharacter");
+  if (!saved) return null;
+
+  try {
+    return JSON.parse(saved);
+  } catch {
+    return null;
+  }
+}
+
+function saveCharacter(character) {
+  localStorage.setItem("tabletopCharacter", JSON.stringify(character));
+}
+
+function renderCheckRow(name, stat, stats, level, proficient = false) {
+  const total = abilityMod(stats[stat]) + (proficient ? proficiencyBonus(level) : 0);
+
+  return `
+    <div class="sheet-check-row">
+      <span class="check-circle ${proficient ? "checked" : ""}"></span>
+      <span class="check-mod">${formatFlatMod(total)}</span>
+      <span class="check-name">${escapeHtml(name)}</span>
+      <span class="check-stat">${stat.slice(0, 3).toUpperCase()}</span>
+    </div>
+  `;
+}
+
+function render() {
+  const character = loadCharacter();
+  const container = document.getElementById("profile");
+
+  if (!character) {
+    container.innerHTML = `
+      <div class="warning-card over">
+        <h2>No Character Found</h2>
+        <p>Create and save a character first.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const stats = character.stats || {};
+  const level = Number(character.level || 1);
+  const prof = proficiencyBonus(level);
+  const starter = character.starterPokemon || "";
+
+  if (!Array.isArray(character.pokemonParty)) {
+    character.pokemonParty = ["", "", "", "", "", ""];
+  }
+
+  while (character.pokemonParty.length < 6) {
+    character.pokemonParty.push("");
+  }
+
+  character.pokemonParty = character.pokemonParty.slice(0, 6);
+
+  if (starter) {
+    character.pokemonParty[0] = starter;
+  }
+
+  const initiative = abilityMod(stats.Dexterity);
+  const armorClass = 10 + abilityMod(stats.Dexterity);
+  const speed = 30;
+  const maxHp = 10 + abilityMod(stats.Constitution);
+  const spellDc = 8 + prof + abilityMod(stats.Wisdom);
+
+  saveCharacter(character);
+
+  container.innerHTML = `
+    <div class="sheet-page-one">
+
+      <div class="sheet-top">
+        <div class="sheet-name-box">
+          <span class="sheet-label">Character Name</span>
+          <h2>${escapeHtml(character.name) || "Unnamed Character"}</h2>
+        </div>
+
+        <div class="sheet-meta-box">
+          <div>
+            <span class="sheet-label">Class & Level</span>
+            <strong>Level ${level} ${escapeHtml(character.className)}</strong>
+          </div>
+          <div>
+            <span class="sheet-label">Background</span>
+            <strong>${escapeHtml(character.alignment) || "Not set"}</strong>
+          </div>
+          <div>
+            <span class="sheet-label">Player Name</span>
+            <strong>Player</strong>
+          </div>
+          <div>
+            <span class="sheet-label">Experience Points</span>
+            <strong>0</strong>
+          </div>
+        </div>
+
+        <div class="pokemon-party">
+          ${character.pokemonParty.map(pokemon => `
+            <div class="pokemon-ball-slot" title="${pokemon ? escapeHtml(pokemon) : "Empty Slot"}">
+              <img src="ballclose.png" class="pokemon-ball-img" alt="${pokemon ? escapeHtml(pokemon) : "Empty Slot"}">
+              <span class="pokemon-ball-name">${pokemon ? escapeHtml(pokemon) : ""}</span>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+
+      <div class="sheet-main-grid">
+
+        <div class="ability-column">
+          ${statNames.map(stat => `
+            <div class="ability-box">
+              <span class="sheet-label">${stat}</span>
+              <strong>${stats[stat] || 8}</strong>
+              <em>${formatModFromScore(stats[stat] || 8)}</em>
+            </div>
+          `).join("")}
+        </div>
+
+        <div class="sheet-list-box">
+          <h3>Saving Throws</h3>
+          ${savingThrows.map(([name, stat]) => renderCheckRow(name, stat, stats, level)).join("")}
+
+          <h3>Skills</h3>
+          ${skills.map(([name, stat]) => renderCheckRow(name, stat, stats, level)).join("")}
+        </div>
+
+        <div class="center-sheet-column">
+          <div class="small-stat-grid">
+            <div class="small-sheet-box">
+              <span class="sheet-label">Initiative</span>
+              <strong>${formatFlatMod(initiative)}</strong>
+            </div>
+            <div class="small-sheet-box">
+              <span class="sheet-label">Armor Class</span>
+              <strong>${armorClass}</strong>
+            </div>
+          </div>
+
+          <div class="wide-sheet-box">
+            <span class="sheet-label">Defenses</span>
+            <p>None listed</p>
+          </div>
+
+          <div class="wide-sheet-box">
+            <span class="sheet-label">Proficiency Bonus</span>
+            <strong>+${prof}</strong>
+          </div>
+
+          <div class="wide-sheet-box">
+            <span class="sheet-label">Ability Save DC</span>
+            <strong>${spellDc}</strong>
+          </div>
+
+          <div class="wide-sheet-box">
+            <span class="sheet-label">Speed</span>
+            <strong>${speed} ft.</strong>
+          </div>
+
+          <div class="wide-sheet-box actions-box">
+            <span class="sheet-label">Actions</span>
+            <p>${escapeHtml(character.notes) || "No actions listed yet."}</p>
+          </div>
+        </div>
+
+        <div class="right-sheet-column">
+          <div class="hp-box">
+            <div>
+              <span class="sheet-label">Max HP</span>
+              <strong>${maxHp}</strong>
+            </div>
+            <div>
+              <span class="sheet-label">Current HP</span>
+              <strong>${maxHp}</strong>
+            </div>
+            <div>
+              <span class="sheet-label">Temp HP</span>
+              <strong>0</strong>
+            </div>
+          </div>
+
+          <div class="death-box">
+            <span class="sheet-label">Hit Dice</span>
+            <strong>1d8</strong>
+            <span class="sheet-label">Death Saves</span>
+            <p>Successes ○○○<br>Failures ○○○</p>
+          </div>
+
+          <div class="wide-sheet-box">
+            <span class="sheet-label">Proficiencies & Languages</span>
+            <p>${escapeHtml(character.className)} training</p>
+          </div>
+
+          <div class="wide-sheet-box">
+            <span class="sheet-label">Background</span>
+            <p><strong>Faith:</strong> ${escapeHtml(character.faith) || "Not set"}</p>
+            <p><strong>Personality:</strong> ${escapeHtml(character.personality) || "Not set"}</p>
+            <p><strong>Physical:</strong> ${escapeHtml(character.physical) || "Not set"}</p>
+          </div>
+        </div>
+
+        <div class="senses-box">
+          <div>
+            <span class="sheet-label">Passive Wisdom (Perception)</span>
+            <strong>${passiveScore(stats.Wisdom, false, level)}</strong>
+          </div>
+          <div>
+            <span class="sheet-label">Passive Wisdom (Insight)</span>
+            <strong>${passiveScore(stats.Wisdom, false, level)}</strong>
+          </div>
+          <div>
+            <span class="sheet-label">Passive Intelligence (Investigation)</span>
+            <strong>${passiveScore(stats.Intelligence, false, level)}</strong>
+          </div>
+        </div>
+
+        <div class="attacks-box">
+          <span class="sheet-label">Weapon Attacks & Cantrips</span>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Hit</th>
+                <th>Damage / Type</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Pokémon Command</td>
+                <td>+${prof}</td>
+                <td>Varies</td>
+                <td>Uses active Pokémon</td>
+              </tr>
+              <tr>
+                <td>Capture Throw</td>
+                <td>${formatFlatMod(abilityMod(stats.Dexterity) + prof)}</td>
+                <td>Capture</td>
+                <td>Modified by ball and target condition</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  `;
+}
+
+render();
+</script>
+
+<script src="inventory.js"></script>
+</body>
+</html>
